@@ -1,0 +1,120 @@
+#!/bin/sh
+# install-python3-alternative-3.7-altinstall -- Install a "python3" alternative
+# 
+# This script assumes you have built python3.7 from source and done a
+# 
+#     make altinstall
+#
+# In order to get files installed to /usr/local/bin, /usr/local/share, etc.
+#
+V="${V:-3.7}"
+PRI="${PRI:-100}"
+# Directories where "alternative" python$VERSION is found.
+ALT="${ALT:-/usr/local}"
+ALT_BIN="${ALT}/bin"
+ALT_MAN1="${ALT}/share/man/man1"
+# Directories where "official" python3 stuff lives
+USR_BIN="${USR_BIN:-/usr/bin}"
+USR_MAN1="${USR_MAN1:-/usr/share/man/man1}"
+
+# Set $? to true(0) if package is installed, else false(!0)
+package_installed() {
+	dpkg -S "$1" >/dev/null 2>&1
+}
+
+if [ `id -u` -eq 0 ]; then
+	SUDO=""
+else
+	SUDO="sudo"
+fi
+
+cat <<MSG
+
+
+Running 'update-alternatives' two times. First, to remove any previous 
+install of this alternative. Second, to install this alternative. 
+
+If you are not root, this will run under 'sudo' and you will be prompted
+for you password. (If you do not have permission to run sudo, give up. 
+Installing an alternative requires root privs.)
+
+
+MSG
+
+#set -x
+$SUDO update-alternatives --verbose --remove python3 "$ALT_BIN"/python$V
+
+if [ $? -ne 0 ]; then
+	printf "Failed to remove prior version! Are you a sudoer?"
+	exit
+fi
+
+# 	link 			name 	path 				priority
+$SUDO update-alternatives --verbose \
+--install "$USR_BIN"/python3	python3 "$ALT_BIN"/python$V		$PRI \
+--slave	"$USR_BIN"/2to3		2to3	"$ALT_BIN"/2to3-$V		\
+--slave	"$USR_BIN"/easy_install3 easy_install3 "$ALT_BIN"/easy_install-$V \
+--slave	"$USR_BIN"/f2py3	f2py3	"$ALT_BIN"/f2py$V		\
+--slave "$USR_BIN"/idle3	idle3	"$ALT_BIN"/idle$V		\
+--slave "$USR_BIN"/pdb3		pdb3	"$ALT"/lib/python$V/pdb.py	\
+--slave "$USR_BIN"/pip3		pip3	"$ALT_BIN"/pip$V		\
+--slave "$USR_BIN"/pydoc3	pydoc3	"$ALT_BIN"/pydoc$V		\
+--slave "$USR_BIN"/python3m	python3m "$ALT_BIN"/python${V}m		\
+--slave "$USR_BIN"/python3m-config python3m-config "$ALT_BIN"/python${V}m-config \
+--slave "$USR_BIN"/pyvenv	pyvenv	"$ALT_BIN"/pyvenv-$V		\
+--slave "$USR_MAN1"/python3.1	man.python3 "$ALT_MAN1"/python${V}.1    \
+# done
+
+set +vx
+
+# NOTE: pygettext seems to have disappeared. Maybe 3.5 only?
+
+cat <<MSG
+
+Running 'update-alternatives' to set the new link-group active, for
+verification.
+
+MSG
+
+# Set the link-group active.
+$SUDO update-alternatives --set python3 "$ALT_BIN"/python$V
+
+islink() {
+	if [ "$1" -ef "$2" ]; then
+		: Do nothing, all okay.
+	else
+		printf "Link '$1' does not point to '$2'\n" >&2
+	fi
+}
+
+if islink "$USR_BIN"/python3            "$ALT_BIN"/python$V           \
+&& islink "$USR_BIN"/2to3               "$ALT_BIN"/2to3-$V            \
+&& islink "$USR_BIN"/easy_install3      "$ALT_BIN"/easy_install-$V    \
+&& islink "$USR_BIN"/f2py3              "$ALT_BIN"/f2py$V             \
+&& islink "$USR_BIN"/idle3              "$ALT_BIN"/idle$V             \
+&& islink "$USR_BIN"/pdb3               "$ALT"/lib/python$V/pdb.py    \
+&& islink "$USR_BIN"/pip3               "$ALT_BIN"/pip$V              \
+&& islink "$USR_BIN"/pydoc3             "$ALT_BIN"/pydoc$V            \
+&& islink "$USR_BIN"/python3m           "$ALT_BIN"/python${V}m        \
+&& islink "$USR_BIN"/python3m-config    "$ALT_BIN"/python${V}m-config \
+&& islink "$USR_BIN"/pyvenv             "$ALT_BIN"/pyvenv-$V          \
+&& islink "$USR_MAN1"/python3.1         "$ALT_MAN1"/python${V}.1      \
+; then
+	printf "python3 alternative successfully installed!\n"
+else 
+	printf "python3 alternative not installed successfully\n"
+fi
+
+cat <<MSG
+
+The new link-group is still active. You might want to run
+
+    update-alternatives --auto python3 
+
+to set it to auto mode, or run 
+
+    update-alternatives --set python3 /some/particular/version
+
+to manually set a particular configuration.
+
+MSG
